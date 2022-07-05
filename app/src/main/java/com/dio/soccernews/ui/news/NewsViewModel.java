@@ -4,30 +4,65 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.dio.soccernews.data.remote.SoccerNewsApi;
 import com.dio.soccernews.domain.News;
 
-import java.util.ArrayList;
 import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class NewsViewModel extends ViewModel {
 
-    private final MutableLiveData<List<News>> news;
+    public enum State {
+        DOING, DONE, ERROR;
+    }
+
+    private final MutableLiveData<List<News>> news = new MutableLiveData<>();
+    private final MutableLiveData<State> state = new MutableLiveData();
+    private final SoccerNewsApi api;
+
 
     public NewsViewModel() {
-        this.news = new MutableLiveData<>();
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl("https://diegoalrais.github.io/soccer_news_api/")
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
 
-        //TODO REMOVER MOCK DE NOTÍCIAS
-        List<News> news = new ArrayList<>();
-        news.add(new News("Ferroviária Tem Desfalque Importante", "Golpe fazia parte de uma quadrilha especializada."));
-        news.add(new News("Ferrinha Joga No Sábado", "Jogo será repleto de emoção"));
-        news.add(new News("Copa Do MUndo Feminina Está Terminando", "Um das últimas partidas terá Brasil e Argetina"));
+         api = retrofit.create(SoccerNewsApi.class);
 
-        this.news.setValue(news);
+        this.findNews();
 
     }
 
-    public LiveData<List<News>> getNews() {
+    public void findNews() {
+        state.setValue(State.DOING);
+        api.getNews().enqueue(new Callback<List<News>>() {
+            @Override
+            public void onResponse(Call<List<News>> call, Response<List<News>> response) {
+                if( response.isSuccessful()) {
+                    news.setValue(response.body());
+                    state.setValue(State.DONE);
+                } else {
+                    state.setValue(State.ERROR);
+                }
+            }
 
+            @Override
+            public void onFailure(Call<List<News>> call, Throwable t) {
+                state.setValue(State.ERROR);
+            }
+        });
+    }
+
+    public LiveData<List<News>> getNews() {
         return this.news;
+    }
+
+    public LiveData<State> getState() {
+        return this.state;
     }
 }
